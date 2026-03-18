@@ -1236,26 +1236,52 @@ function submitPassword() {
   btn.textContent = 'Checking...';
   err.textContent = '';
 
-  // Validate password against proxy by sending a ping request
-  fetch(GAS_PROXY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: pw, ping: true, provider: 'anthropic', model: 'claude-haiku-4-5-20251001', prompt: 'ping' })
+  // GAS Web Apps require no-cors mode from browsers when called cross-origin.
+  // We use no-cors which means we can't read the response body —
+  // so we do a two-step: no-cors ping to wake the proxy, then a readable fetch.
+  // Actually GAS with "Anyone" access does support cors reads — but only via GET.
+  // For POST we use a GET ping first to confirm the proxy is alive,
+  // then trust the password check result from the POST.
+
+  // Step 1: GET ping to confirm proxy is reachable
+  fetch(GAS_PROXY_URL, { method: 'GET' })
+  .then(r => {
+    if (!r.ok && r.status !== 200) throw new Error('PROXY_DOWN');
+    return r.json().catch(() => { throw new Error('AUTH_REQUIRED'); });
   })
-  .then(r => r.json())
+  .then(pingData => {
+    if (!pingData.status) throw new Error('AUTH_REQUIRED');
+    // Step 2: POST with password
+    return fetch(GAS_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },  // avoid CORS preflight
+      body: JSON.stringify({ password: pw, ping: true, provider: 'google', model: 'gemini-2.5-flash-preview', prompt: 'ping' })
+    });
+  })
+  .then(r => r.json().catch(() => { throw new Error('AUTH_REQUIRED'); }))
   .then(data => {
     if (data._status === 401) {
       err.textContent = 'Incorrect password. Try again.';
       input.value = '';
       input.focus();
     } else {
-      // Password accepted — store and dismiss screen
       SESSION_PASSWORD = pw;
       document.getElementById('passwordScreen').style.display = 'none';
     }
   })
   .catch(e => {
-    err.textContent = 'Could not reach proxy: ' + e.message;
+    if (e.message === 'AUTH_REQUIRED') {
+      err.innerHTML = 'The proxy script needs Google permissions.<br>'
+        + '<a href="' + GAS_PROXY_URL + '" target="_blank" '
+        + 'style="color:var(--gold);font-size:0.8rem;">'
+        + '→ Open this link, grant permissions, then try again</a>';
+    } else if (e.message === 'PROXY_DOWN' || e.message.includes('fetch') || e.message.includes('Failed')) {
+      err.innerHTML = 'Cannot reach proxy. Check that the GAS Web App is deployed.<br>'
+        + '<a href="' + GAS_PROXY_URL + '" target="_blank" '
+        + 'style="color:var(--gold-light);font-size:0.75rem;">' + GAS_PROXY_URL.slice(0,60) + '...</a>';
+    } else {
+      err.textContent = e.message;
+    }
   })
   .finally(() => {
     btn.disabled = false;
@@ -1268,7 +1294,7 @@ function submitPassword() {
 async function callAI(systemPrompt, userPrompt) {
   const res = await fetch(GAS_PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'text/plain' },  // avoids CORS preflight
     body: JSON.stringify({
       password: SESSION_PASSWORD,
       provider: 'google',
