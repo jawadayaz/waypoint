@@ -599,6 +599,48 @@
   .badge-alt { background: var(--teal-light); color: var(--teal); }
   .badge-direct { background: #edf7ed; color: #2d6e2d; }
   .badge-mixed  { background: #f0eafa; color: #6b3fa0; }
+  .badge-self   { background: #e8f4fd; color: #1565a8; }
+
+  .caveat-box {
+    background: var(--color-background-warning);
+    border: 0.5px solid var(--color-border-warning);
+    border-radius: var(--border-radius-md);
+    padding: 0.6rem 0.85rem;
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--color-text-warning);
+    line-height: 1.6;
+  }
+  .caveat-box .caveat-title {
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .seg-pricing {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0.5rem 0;
+    font-size: 0.78rem;
+  }
+  .seg-pricing-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .seg-pricing-row:last-child { border-bottom: none; }
+  .seg-cabin-badge {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .seg-cabin-biz  { background: #f0eafa; color: #6b3fa0; }
+  .seg-cabin-eco  { background: #edf7ed; color: #2d6e2d; }
 
   .card-top {
     display: flex;
@@ -1059,7 +1101,7 @@
   <div class="pw-card">
     <div class="pw-logo">✦ LuckyLast Travel</div>
     <div class="pw-tagline">Find cheaper fares to wherever</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v2.9</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v2.10</div>
     <label class="pw-label" for="pwInput">Access Password</label>
     <input class="pw-input" type="password" id="pwInput" placeholder="Enter password" autocomplete="current-password"
       onkeydown="if(event.key==='Enter') submitPassword()">
@@ -1072,7 +1114,7 @@
 <header>
   <div class="logo">✦ <span>LuckyLast Travel</span></div>
   <div style="display:flex;align-items:center;gap:1rem;">
-    <div class="header-tag" id="headerVersion">v2.9</div>
+    <div class="header-tag" id="headerVersion">v2.10</div>
     <div class="header-tag">AI-Powered Fare Intelligence</div>
   </div>
 </header>
@@ -1296,7 +1338,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'v2.9';
+const APP_VERSION = 'v2.10';
 let SESSION_PASSWORD = '';
 let LAST_RESULTS = null;       // cached last search results for currency re-render
 let LAST_EXCHANGE_RATE = 1.0;  // rate used when results were fetched
@@ -1857,7 +1899,8 @@ function renderResults(data, originCode, destCode) {
     let badge = '';
     if (isBest && !isAlt) badge = `<div class="card-badge badge-best">★ Best Fare</div>`;
     else if (isAlt) badge = `<div class="card-badge badge-alt">✦ Nearby Alternative</div>`;
-    else if (r.type === 'mixed') badge = `<div class="card-badge badge-mixed">⇓ Mixed Cabin</div>`;
+    else if (r.type === 'mixed')        badge = `<div class="card-badge badge-mixed">⇓ Mixed Cabin</div>`;
+    else if (r.type === 'self-connect') badge = `<div class="card-badge badge-self">⇆ Self-Connect · Mixed Cabin</div>`;
     else if (r.stops === 0) badge = `<div class="card-badge badge-direct">● Non-stop</div>`;
     else badge = `<div class="card-badge" style="background:var(--cream);color:var(--ink-muted);">${r.stops} stop${r.stops>1?'s':''}</div>`;
 
@@ -1952,9 +1995,30 @@ function renderResults(data, originCode, destCode) {
         </div>
         <div class="card-expanded">
           ${segTable}
-          ${r.notes ? `<div class="alt-explanation" style="margin-bottom:0.75rem;">${r.notes}</div>` : ''}
+          ${r.type === 'self-connect' && r.segmentPricing ? `
+          <div class="seg-pricing">
+            ${r.segmentPricing.map(s => `
+              <div class="seg-pricing-row">
+                <span>${s.route} · ${s.duration} · ${s.dep}</span>
+                <span>
+                  <span class="seg-cabin-badge ${s.cabin === 'Business' ? 'seg-cabin-biz' : 'seg-cabin-eco'}">${s.cabin}</span>
+                  &nbsp;${(s.price * (r.price / r.usdPrice)).toLocaleString(undefined, {minimumFractionDigits:0,maximumFractionDigits:0})} ${r.currency}
+                </span>
+              </div>`).join('')}
+            <div class="seg-pricing-row" style="font-weight:500;">
+              <span>Total self-connect</span>
+              <span>${r.price.toLocaleString(undefined, {minimumFractionDigits:0,maximumFractionDigits:0})} ${r.currency}
+                &nbsp;<span style="color:var(--teal);font-size:0.78rem;">saves ~${r.savingPct}%</span>
+              </span>
+            </div>
+          </div>` : ''}
+          ${r.caveats && r.caveats.length > 0 ? `
+          <div class="caveat-box">
+            <div class="caveat-title">⚠ Self-connect caveats</div>
+            ${r.caveats.map(c => `<div>${c}</div>`).join('')}
+          </div>` : r.notes ? `<div class="alt-explanation" style="margin-bottom:0.75rem;">${r.notes}</div>` : ''}
           <div class="book-btn-row">
-            <div class="book-disclaimer">Real fares from airlines via Duffel. Price confirmed at booking.</div>
+            <div class="book-disclaimer">${r.type === 'self-connect' ? 'Two separate bookings required — see caveats above.' : 'Real fares from airlines via Duffel. Price confirmed at booking.'}</div>
             <a class="book-btn" href="${bookUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
               ${bookLabel}
             </a>
