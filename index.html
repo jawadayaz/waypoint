@@ -1246,6 +1246,15 @@ function setDefaultDates() {
   document.getElementById('returnDate').value = d2.toISOString().split('T')[0];
 }
 
+// ── RESTORE PASSWORD — skip login screen if already authenticated ────────────
+try {
+  const savedPw = localStorage.getItem('waypoint_password');
+  if (savedPw) {
+    SESSION_PASSWORD = savedPw;
+    document.getElementById('passwordScreen').style.display = 'none';
+  }
+} catch(e) {}
+
 // Restore saved state, or fall back to defaults
 if (!restoreSearch()) setDefaultDates();
 
@@ -1341,6 +1350,7 @@ function submitPassword() {
       input.focus();
     } else {
       SESSION_PASSWORD = pw;
+      try { localStorage.setItem('waypoint_password', pw); } catch(e) {}
       document.getElementById('passwordScreen').style.display = 'none';
     }
   })
@@ -1439,6 +1449,7 @@ async function doSearch() {
   } catch(err) {
     if (err.message.includes('Session expired')) {
       SESSION_PASSWORD = '';
+      try { localStorage.removeItem('waypoint_password'); } catch(e) {}
       document.getElementById('passwordScreen').style.display = 'flex';
     }
     renderError(err.message);
