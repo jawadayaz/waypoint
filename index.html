@@ -447,6 +447,107 @@
     letter-spacing: 0.08em;
   }
 
+  /* ── EXPAND/COLLAPSE ── */
+  .flight-card { cursor: pointer; }
+
+  .card-expanded { display: none; }
+  .flight-card.is-expanded .card-expanded { display: block; }
+  .flight-card.is-expanded { box-shadow: var(--shadow-lg); }
+
+  .expand-chevron {
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    transition: transform 0.2s;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .flight-card.is-expanded .expand-chevron { transform: rotate(180deg); }
+
+  .segment-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.82rem;
+  }
+  .segment-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    text-align: left;
+    padding: 0 0.5rem 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+  .segment-table td {
+    padding: 0.5rem 0.5rem 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink-muted);
+    vertical-align: middle;
+  }
+  .segment-table tr:last-child td { border-bottom: none; }
+  .segment-table td.seg-route {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--ink);
+  }
+  .segment-table td.seg-time { color: var(--ink); font-weight: 500; }
+  .segment-table td.seg-cabin {
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+  }
+
+  .layover-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    font-family: 'DM Mono', monospace;
+  }
+  .layover-row::before {
+    content: '';
+    width: 16px; height: 1px;
+    background: var(--border-strong);
+    flex-shrink: 0;
+  }
+
+  .book-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .book-btn:hover { background: #c9a44a; }
+  .book-btn:active { transform: scale(0.98); }
+  .book-btn-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .book-disclaimer {
+    font-size: 0.7rem;
+    color: var(--ink-faint);
+    line-height: 1.4;
+  }
+
   /* ── FLIGHT CARD ── */
   .flight-cards { display: flex; flex-direction: column; gap: 1rem; }
 
@@ -958,7 +1059,7 @@
   <div class="pw-card">
     <div class="pw-logo">✦ LuckyLast Travel</div>
     <div class="pw-tagline">Find cheaper fares to wherever</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v1.8</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v2.0</div>
     <label class="pw-label" for="pwInput">Access Password</label>
     <input class="pw-input" type="password" id="pwInput" placeholder="Enter password" autocomplete="current-password"
       onkeydown="if(event.key==='Enter') submitPassword()">
@@ -971,7 +1072,7 @@
 <header>
   <div class="logo">✦ <span>LuckyLast Travel</span></div>
   <div style="display:flex;align-items:center;gap:1rem;">
-    <div class="header-tag" id="headerVersion">v1.8</div>
+    <div class="header-tag" id="headerVersion">v2.0</div>
     <div class="header-tag">AI-Powered Fare Intelligence</div>
   </div>
 </header>
@@ -1195,7 +1296,7 @@
 </div>
 
 <script>
-const APP_VERSION = 'v1.8';
+const APP_VERSION = 'v2.0';
 let SESSION_PASSWORD = '';
 
 // ── AIRPORTS DB (common ones) ──
@@ -1496,17 +1597,14 @@ function submitPassword() {
 }
 
 
-// ── CALL AI VIA GAS PROXY ──
-async function callAI(systemPrompt, userPrompt) {
+// ── CALL PROXY — sends search params, proxy handles Duffel + Gemini ──
+async function callAI(searchParams) {
   const res = await fetch(GAS_PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({
       password: SESSION_PASSWORD,
-      provider: 'google',
-      model:    GOOGLE_MODEL,
-      system:   systemPrompt,
-      prompt:   userPrompt,
+      ...searchParams,
     })
   });
 
@@ -1558,12 +1656,15 @@ async function doSearch() {
 
   showLoading(originCode, destCode);
 
-  const userPrompt   = buildPrompt({ originCode, destCode, departDate, returnDate, tripType,
-    cabinClass, passengers, maxStops, maxTravelTime, maxLayover, flexDates, smartSearch, savingsThresh, currency, nearbyFlightTime, mixedCabin, mixedCabinTime, mixedCabinDay });
-  const systemPrompt = 'You are a flight data assistant. Return ONLY valid JSON with no markdown fences and no preamble. Generate realistic flight options using real airlines, real hub airports, and realistic durations and prices for the given route.';
+  const searchParams = {
+    originCode, destCode, departDate, returnDate, tripType,
+    cabinClass, passengers, maxStops, maxTravelTime, maxLayover,
+    flexDates, smartSearch, savingsThresh, currency, nearbyFlightTime,
+    mixedCabin, mixedCabinTime, mixedCabinDay,
+  };
 
   try {
-    const text  = await callAI(systemPrompt, userPrompt);
+    const text  = await callAI(searchParams);
     const clean = text.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
 
     let result;
@@ -1585,8 +1686,71 @@ async function doSearch() {
   }
 }
 
-function buildPrompt({ originCode, destCode, departDate, returnDate, tripType, cabinClass,
-  passengers, maxStops, maxTravelTime, maxLayover, flexDates, smartSearch, savingsThresh, currency, nearbyFlightTime, mixedCabin, mixedCabinTime, mixedCabinDay }) {
+// ── AIRLINE BOOKING URL BUILDER ──────────────────────────────────────────────
+function buildBookingUrl(airline, origin, dest, departDate, returnDate, tripType, cabin, passengers) {
+  const cls = { economy:'Y', premium:'W', business:'C', first:'F' }[cabin] || 'Y';
+  const pax = parseInt(passengers) || 1;
+  const dep = departDate.replace(/-/g,'');  // YYYYMMDD
+  const ret = returnDate ? returnDate.replace(/-/g,'') : '';
+  const trip = tripType === 'oneway' ? 'O' : 'R';
+
+  // Airline-specific deep-link formats
+  const a = (airline || '').toLowerCase();
+
+  if (a.includes('air india')) {
+    return `https://www.airindia.com/book-flights.html#origin=${origin}&destination=${dest}&departDate=${dep}${ret?'&returnDate='+ret:''}&tripType=${trip}&adults=${pax}&cabin=${cls}`;
+  }
+  if (a.includes('emirates')) {
+    return `https://www.emirates.com/us/english/booking/flightSearch/?origin=${origin}&destination=${dest}&departDate=${dep}${ret?'&returnDate='+ret:''}&tripType=${trip}&adults=${pax}&class=${cls}`;
+  }
+  if (a.includes('qatar')) {
+    return `https://www.qatarairways.com/en/booking/flight-search.html?widget=QR&selLang=en&tripType=${trip}&fromStation=${origin}&toStation=${dest}&departing=${dep}${ret?'&returning='+ret:''}&adults=${pax}&class=${cls}`;
+  }
+  if (a.includes('etihad')) {
+    return `https://www.etihad.com/en-ae/book/flights?from=${origin}&to=${dest}&departDate=${dep}${ret?'&returnDate='+ret:''}&tripType=${trip}&adults=${pax}&class=${cls}`;
+  }
+  if (a.includes('lufthansa')) {
+    return `https://www.lufthansa.com/us/en/flight-search?origin=${origin}&destination=${dest}&outboundDate=${dep}${ret?'&inboundDate='+ret:''}&tripType=${trip}&adults=${pax}&travelClass=${cls}`;
+  }
+  if (a.includes('british airways') || a.includes('ba ')) {
+    return `https://www.britishairways.com/travel/book/public/en_gb?eId=106000&from=${origin}&to=${dest}&depart=${dep}${ret?'&return='+ret:''}&cabin=${cls}&adult=${pax}`;
+  }
+  if (a.includes('klm')) {
+    return `https://www.klm.com/search/flights?origin=${origin}&destination=${dest}&outboundDate=${dep}${ret?'&inboundDate='+ret:''}&tripType=${trip}&adults=${pax}&cabinClass=${cls}`;
+  }
+  if (a.includes('air france')) {
+    return `https://www.airfrance.com/search/flights?origin=${origin}&destination=${dest}&outboundDate=${dep}${ret?'&inboundDate='+ret:''}&adults=${pax}&cabin=${cls}`;
+  }
+  if (a.includes('singapore')) {
+    return `https://www.singaporeair.com/en_UK/sg/plan-travel/book-a-flight/?origin=${origin}&destination=${dest}&departDate=${dep}${ret?'&returnDate='+ret:''}&tripType=${trip}&adults=${pax}&cabin=${cls}`;
+  }
+  if (a.includes('indigo') || a.includes('6e')) {
+    return `https://www.goindigo.in/flight-booking.html?origin=${origin}&dest=${dest}&departDate=${dep}&adult=${pax}&infant=0&child=0&tripType=${tripType === 'oneway' ? 'O' : 'R'}`;
+  }
+  if (a.includes('united')) {
+    return `https://www.united.com/ual/en/us/flight-search/book-a-flight/results/rev?f=${origin}&t=${dest}&d=${dep}${ret?'&r='+ret:''}&tt=${trip === 'O' ? '1' : '2'}&sc=${cls}&px=${pax}`;
+  }
+  if (a.includes('american')) {
+    return `https://www.aa.com/booking/flights/search?type=${trip === 'O' ? 'OneWay' : 'RoundTrip'}&origin=${origin}&destination=${dest}&departDate=${dep}${ret?'&returnDate='+ret:''}&passengers=${pax}&cabin=${cls}`;
+  }
+  if (a.includes('delta')) {
+    return `https://www.delta.com/flight-search/book-a-flight?tripType=${trip === 'O' ? 'ONE_WAY' : 'ROUND_TRIP'}&fromAirportCode=${origin}&toAirportCode=${dest}&departureDate=${dep}${ret?'&returnDate='+ret:''}&paxCount=${pax}&cabin=${cls}`;
+  }
+  if (a.includes('tap')) {
+    return `https://www.flytap.com/en-gb/flight-search?from=${origin}&to=${dest}&departure=${dep}${ret?'&return='+ret:''}&adults=${pax}&cabin=${cls}`;
+  }
+  if (a.includes('iberia')) {
+    return `https://www.iberia.com/flights/?origin=${origin}&destination=${dest}&departureDate=${dep}${ret?'&returnDate='+ret:''}&adults=${pax}&cabin=${cls}`;
+  }
+
+  // Generic Google Flights fallback for any other airline
+  const gDep = departDate;
+  const gRet = returnDate || '';
+  const gClass = { economy:'1', premium:'2', business:'3', first:'4' }[cabin] || '1';
+  return `https://www.google.com/travel/flights?q=flights+from+${origin}+to+${dest}&hl=en&curr=USD#flt=${origin}.${dest}.${gDep}${gRet?'*'+dest+'.'+origin+'.'+gRet:''}`;
+}
+
+) {
 
   const originInfo = AIRPORTS.find(a => a.code === originCode) || { city: originCode };
   const destInfo   = AIRPORTS.find(a => a.code === destCode)   || { city: destCode };
@@ -1659,12 +1823,16 @@ type values: "direct" | "onestop" | "value" | "alternative"
 alternativeInsight: one-sentence string summarising the best alternative saving, or null.`;
 }
 
+function toggleCard(el) {
+  el.classList.toggle('is-expanded');
+}
+
 function showLoading(origin, dest) {
   const panel = document.getElementById('resultsPanel');
   panel.innerHTML = `
     <div class="ai-status">
       <div class="ai-dot"></div>
-      AI searching ${origin} → ${dest} and nearby alternatives...
+      Searching live fares for ${origin} → ${dest}...
     </div>
     <div class="loading-state">
       ${[1,2,3].map(()=>`
@@ -1686,6 +1854,8 @@ function renderError(msg) {
 }
 
 function renderResults(data, originCode, destCode) {
+  // summary used by booking URL builder
+  const summary = data.searchSummary || {};
   const panel = document.getElementById('resultsPanel');
   if (data.error || !data.results) {
     renderError(data.error || 'No results returned.');
@@ -1693,7 +1863,6 @@ function renderResults(data, originCode, destCode) {
   }
 
   const results = (data.results || []).sort((a, b) => (a.price || 0) - (b.price || 0));
-  const summary = data.searchSummary || {};
   const altInsight = data.alternativeInsight;
 
   const prices = results.map(r=>r.price).filter(Boolean);
