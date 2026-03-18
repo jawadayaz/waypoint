@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Waypoint — Smart Travel Planner</title>
+<title>LuckyLast Travel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -497,6 +497,7 @@
   .badge-best { background: #fef3d9; color: #8b6a1a; }
   .badge-alt { background: var(--teal-light); color: var(--teal); }
   .badge-direct { background: #edf7ed; color: #2d6e2d; }
+  .badge-mixed  { background: #f0eafa; color: #6b3fa0; }
 
   .card-top {
     display: flex;
@@ -581,6 +582,12 @@
     font-weight: 400;
     color: var(--ink);
     line-height: 1;
+  }
+  .price-currency {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    margin-right: 2px;
+    vertical-align: super;
   }
 
   .price-label {
@@ -949,9 +956,9 @@
 
 <div id="passwordScreen">
   <div class="pw-card">
-    <div class="pw-logo">✦ Waypoint</div>
-    <div class="pw-tagline">Smart Travel Planner</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v1.3</div>
+    <div class="pw-logo">✦ LuckyLast Travel</div>
+    <div class="pw-tagline">Find cheaper fares to wherever</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v1.8</div>
     <label class="pw-label" for="pwInput">Access Password</label>
     <input class="pw-input" type="password" id="pwInput" placeholder="Enter password" autocomplete="current-password"
       onkeydown="if(event.key==='Enter') submitPassword()">
@@ -962,9 +969,9 @@
 </div>
 
 <header>
-  <div class="logo">✦ <span>Waypoint</span></div>
+  <div class="logo">✦ <span>LuckyLast Travel</span></div>
   <div style="display:flex;align-items:center;gap:1rem;">
-    <div class="header-tag" id="headerVersion">v1.3</div>
+    <div class="header-tag" id="headerVersion">v1.8</div>
     <div class="header-tag">AI-Powered Fare Intelligence</div>
   </div>
 </header>
@@ -1003,13 +1010,27 @@
           </div>
         </div>
 
-        <!-- Trip type -->
-        <div class="field-group">
-          <label>Trip Type</label>
-          <select id="tripType">
-            <option value="roundtrip">Round Trip</option>
-            <option value="oneway">One Way</option>
-          </select>
+        <!-- Trip type + Currency -->
+        <div class="field-row">
+          <div class="field-group">
+            <label>Trip Type</label>
+            <select id="tripType">
+              <option value="roundtrip">Round Trip</option>
+              <option value="oneway">One Way</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label>Currency</label>
+            <select id="currency">
+              <option value="INR" selected>INR ₹</option>
+              <option value="USD">USD $</option>
+              <option value="EUR">EUR €</option>
+              <option value="GBP">GBP £</option>
+              <option value="AED">AED د.إ</option>
+              <option value="SGD">SGD S$</option>
+              <option value="AUD">AUD A$</option>
+            </select>
+          </div>
         </div>
 
         <!-- Dates -->
@@ -1102,7 +1123,14 @@
               <div class="toggle-thumb"></div>
             </label>
           </div>
-          <p class="smart-desc">Also checks airports within ~2 hrs flying time of your destination for significantly cheaper routes.</p>
+          <p class="smart-desc">Also checks airports within the flight time below of your destination for significantly cheaper routes.</p>
+          <div class="slider-wrap" style="margin-top:0.6rem;" id="nearbyTimeWrap">
+            <div class="slider-header">
+              <label style="font-size:0.68rem;">Max nearby flight time</label>
+              <span class="slider-val" id="nearbyTimeVal">2 hrs</span>
+            </div>
+            <input type="range" id="nearbyFlightTime" min="1" max="4" value="2" step="0.5">
+          </div>
         </div>
 
         <!-- Budget threshold -->
@@ -1114,6 +1142,36 @@
             <option value="20">20% cheaper</option>
             <option value="30">30% cheaper</option>
           </select>
+        </div>
+
+        <!-- Mixed Cabin Downgrade -->
+        <div class="divider"></div>
+        <div class="smart-toggle">
+          <div class="smart-toggle-header">
+            <div class="smart-label">
+              <div class="smart-icon">⇓</div>
+              Mixed Cabin Savings
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="mixedCabin">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </label>
+          </div>
+          <p class="smart-desc">For multi-stop flights, downgrade to Economy on short or daytime sectors to reduce total fare.</p>
+          <div id="mixedCabinOptions" style="display:none; margin-top:0.75rem;">
+            <div class="slider-wrap" style="margin-bottom:0.75rem;">
+              <div class="slider-header">
+                <label style="font-size:0.68rem;">Downgrade sectors under</label>
+                <span class="slider-val" id="mixedCabinTimeVal">3 hrs</span>
+              </div>
+              <input type="range" id="mixedCabinTime" min="1" max="6" value="3" step="0.5">
+            </div>
+            <label class="check-row">
+              <input type="checkbox" id="mixedCabinDay" checked>
+              <span class="check-label">Also downgrade daytime sectors (06:00–22:00)</span>
+            </label>
+          </div>
         </div>
 
         <!-- Search button -->
@@ -1137,7 +1195,8 @@
 </div>
 
 <script>
-const APP_VERSION = 'v1.3';
+const APP_VERSION = 'v1.8';
+let SESSION_PASSWORD = '';
 
 // ── AIRPORTS DB (common ones) ──
 const AIRPORTS = [
@@ -1242,6 +1301,11 @@ function saveSearch() {
     flexDates:    document.getElementById('flexDates').checked,
     smartSearch:  document.getElementById('smartSearch').checked,
     savingsThresh:document.getElementById('savingsThresh').value,
+    currency:     document.getElementById('currency').value,
+    nearbyFlightTime: document.getElementById('nearbyFlightTime').value,
+    mixedCabin:     document.getElementById('mixedCabin').checked,
+    mixedCabinTime: document.getElementById('mixedCabinTime').value,
+    mixedCabinDay:  document.getElementById('mixedCabinDay').checked,
   };
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
 }
@@ -1257,7 +1321,21 @@ function restoreSearch() {
   if (state.cabinClass)    document.getElementById('cabinClass').value    = state.cabinClass;
   if (state.passengers)    document.getElementById('passengers').value    = state.passengers;
   if (state.maxStops)      document.getElementById('maxStops').value      = state.maxStops;
-  if (state.savingsThresh) document.getElementById('savingsThresh').value = state.savingsThresh;
+  if (state.savingsThresh)     document.getElementById('savingsThresh').value     = state.savingsThresh;
+  if (state.currency)          document.getElementById('currency').value          = state.currency;
+  if (state.nearbyFlightTime) {
+    document.getElementById('nearbyFlightTime').value = state.nearbyFlightTime;
+    document.getElementById('nearbyTimeVal').textContent = state.nearbyFlightTime + ' hrs';
+  }
+  if (state.mixedCabin !== undefined) {
+    document.getElementById('mixedCabin').checked = state.mixedCabin;
+    document.getElementById('mixedCabinOptions').style.display = state.mixedCabin ? 'block' : 'none';
+  }
+  if (state.mixedCabinTime) {
+    document.getElementById('mixedCabinTime').value = state.mixedCabinTime;
+    document.getElementById('mixedCabinTimeVal').textContent = state.mixedCabinTime + ' hrs';
+  }
+  if (state.mixedCabinDay !== undefined) document.getElementById('mixedCabinDay').checked = state.mixedCabinDay;
 
   // Sliders — set value and update label
   if (state.maxTravelTime) {
@@ -1332,6 +1410,15 @@ document.getElementById('maxTravelTime').addEventListener('input', function() {
 document.getElementById('maxLayover').addEventListener('input', function() {
   document.getElementById('layoverVal').textContent = this.value+' hrs';
 });
+document.getElementById('nearbyFlightTime').addEventListener('input', function() {
+  document.getElementById('nearbyTimeVal').textContent = this.value+' hrs';
+});
+document.getElementById('mixedCabin').addEventListener('change', function() {
+  document.getElementById('mixedCabinOptions').style.display = this.checked ? 'block' : 'none';
+});
+document.getElementById('mixedCabinTime').addEventListener('input', function() {
+  document.getElementById('mixedCabinTimeVal').textContent = this.value+' hrs';
+});
 
 // ── DATE FLEXIBILITY CHIPS ──
 document.getElementById('flexDates').addEventListener('change', function() {
@@ -1364,7 +1451,6 @@ const GAS_PROXY_URL = 'https://script.google.com/macros/s/AKfycbz9FsHTjruwKVoW42
 const GOOGLE_MODEL = 'gemini-2.5-flash-preview';  // date suffix resolved automatically by proxy
 
 // ── PASSWORD SCREEN ──
-let SESSION_PASSWORD = '';
 
 function submitPassword() {
   const input = document.getElementById('pwInput');
@@ -1457,9 +1543,14 @@ async function doSearch() {
   const maxStops      = document.getElementById('maxStops').value;
   const maxTravelTime = document.getElementById('maxTravelTime').value;
   const maxLayover    = document.getElementById('maxLayover').value;
-  const flexDates     = document.getElementById('flexDates').checked;
-  const smartSearch   = document.getElementById('smartSearch').checked;
-  const savingsThresh = document.getElementById('savingsThresh').value;
+  const flexDates      = document.getElementById('flexDates').checked;
+  const smartSearch    = document.getElementById('smartSearch').checked;
+  const savingsThresh  = document.getElementById('savingsThresh').value;
+  const currency       = document.getElementById('currency').value;
+  const nearbyFlightTime = document.getElementById('nearbyFlightTime').value;
+  const mixedCabin     = document.getElementById('mixedCabin').checked;
+  const mixedCabinTime = document.getElementById('mixedCabinTime').value;
+  const mixedCabinDay  = document.getElementById('mixedCabinDay').checked;
 
   const btn = document.getElementById('searchBtn');
   btn.disabled = true;
@@ -1468,7 +1559,7 @@ async function doSearch() {
   showLoading(originCode, destCode);
 
   const userPrompt   = buildPrompt({ originCode, destCode, departDate, returnDate, tripType,
-    cabinClass, passengers, maxStops, maxTravelTime, maxLayover, flexDates, smartSearch, savingsThresh });
+    cabinClass, passengers, maxStops, maxTravelTime, maxLayover, flexDates, smartSearch, savingsThresh, currency, nearbyFlightTime, mixedCabin, mixedCabinTime, mixedCabinDay });
   const systemPrompt = 'You are a flight data assistant. Return ONLY valid JSON with no markdown fences and no preamble. Generate realistic flight options using real airlines, real hub airports, and realistic durations and prices for the given route.';
 
   try {
@@ -1495,7 +1586,7 @@ async function doSearch() {
 }
 
 function buildPrompt({ originCode, destCode, departDate, returnDate, tripType, cabinClass,
-  passengers, maxStops, maxTravelTime, maxLayover, flexDates, smartSearch, savingsThresh }) {
+  passengers, maxStops, maxTravelTime, maxLayover, flexDates, smartSearch, savingsThresh, currency, nearbyFlightTime, mixedCabin, mixedCabinTime, mixedCabinDay }) {
 
   const originInfo = AIRPORTS.find(a => a.code === originCode) || { city: originCode };
   const destInfo   = AIRPORTS.find(a => a.code === destCode)   || { city: destCode };
@@ -1512,19 +1603,27 @@ function buildPrompt({ originCode, destCode, departDate, returnDate, tripType, c
   }
 
   const smartBlock = smartSearch ? `
-SMART SEARCH: Also identify 2-3 airports within ~2 hrs flying time of ${destCode} (${destInfo.city}).
+SMART SEARCH: Also identify 2-3 airports within ~${nearbyFlightTime} hrs flying time of ${destCode} (${destInfo.city}).
+Do NOT restrict to the same country — include airports in neighbouring countries if they are within the flight time limit.
 For each, check if flying to THAT airport instead is ${savingsThresh}%+ cheaper than the best ${originCode} to ${destCode} fare.
 If so, include those as type "alternative" with "destination" set to the nearby airport code (not ${destCode}).
-Include a "notes" field explaining the nearby city, approximate distance from ${destInfo.city}, and estimated savings.
-Examples: for LIS consider OPO, MAD, BCN; for RDU consider CLT, IAD, EWR; for LHR consider CDG, AMS, BRU.` : '';
+Include a "notes" field explaining the nearby city, its country if different, approximate distance from ${destInfo.city}, and estimated savings.
+Examples: for LIS consider OPO (PT), MAD (ES), BCN (ES), SVQ (ES); for LHR consider CDG (FR), AMS (NL), BRU (BE), DUB (IE); for SYD consider MEL (AU), BNE (AU); for BLR consider CMB (LK), MAA (IN), HYD (IN).` : '';
 
   return `Generate realistic flight search results for:
 - Origin: ${originCode} (${originInfo.city})
 - Destination: ${destCode} (${destInfo.city})
 - Departure: ${dateRange}${returnDate ? '\n- Return: ' + returnDate : ''}
-- Trip: ${tripType} | Cabin: ${cabinClass} | Passengers: ${parseInt(passengers)}
+- Trip: ${tripType} | Cabin: ${cabinClass} | Passengers: ${parseInt(passengers)} | Currency: ${currency}
 - Max stops: ${maxStops} | Max travel time: ${maxTravelTime}h | Max layover: ${maxLayover}h
 ${smartBlock}
+
+${mixedCabin && cabinClass !== 'economy' ? `
+MIXED CABIN: Also generate 1-2 additional results where Economy class is used on sectors that are:
+- Under ${mixedCabinTime} hours flight time${mixedCabinDay ? ', OR daytime departures between 06:00-22:00' : ''}
+Label these with type "mixed" and fareClass showing e.g. "Business + Economy".
+In the notes field explain which sectors are downgraded and the estimated saving vs full ${cabinClass}.
+These should be meaningfully cheaper (at least 15%) than the equivalent full ${cabinClass} itinerary.` : ''}
 
 Return this exact JSON structure (no markdown, no extra text):
 {
@@ -1543,7 +1642,7 @@ Return this exact JSON structure (no markdown, no extra text):
       "stops": 0,
       "layovers": [],
       "price": 680,
-      "currency": "USD",
+      "currency": "${currency}",
       "fareClass": "Economy Saver",
       "baggageIncluded": true,
       "refundable": false,
@@ -1593,7 +1692,7 @@ function renderResults(data, originCode, destCode) {
     return;
   }
 
-  const results = data.results;
+  const results = (data.results || []).sort((a, b) => (a.price || 0) - (b.price || 0));
   const summary = data.searchSummary || {};
   const altInsight = data.alternativeInsight;
 
@@ -1623,6 +1722,7 @@ function renderResults(data, originCode, destCode) {
     let badge = '';
     if (isBest && !isAlt) badge = `<div class="card-badge badge-best">★ Best Fare</div>`;
     else if (isAlt) badge = `<div class="card-badge badge-alt">✦ Nearby Alternative</div>`;
+    else if (r.type === 'mixed') badge = `<div class="card-badge badge-mixed">⇓ Mixed Cabin</div>`;
     else if (r.stops === 0) badge = `<div class="card-badge badge-direct">● Non-stop</div>`;
     else badge = `<div class="card-badge" style="background:var(--cream);color:var(--ink-muted);">${r.stops} stop${r.stops>1?'s':''}</div>`;
 
@@ -1668,7 +1768,7 @@ function renderResults(data, originCode, destCode) {
             </div>
           </div>
           <div class="card-price">
-            <div class="price-amount">$${r.price.toLocaleString()}</div>
+            <div class="price-amount"><span class="price-currency" id="price-sym-${r.id}"></span>${r.price.toLocaleString()}</div>
             <div class="price-label">per person · ${r.fareClass||'Economy'}</div>
             ${isBest && !isAlt ? '<div class="price-saving">lowest fare</div>' : ''}
             ${isAlt && savings > 0 ? `<div class="price-saving">~${savings}% cheaper</div>` : ''}
@@ -1688,6 +1788,10 @@ function renderResults(data, originCode, destCode) {
 
   html += `</div>`;
   panel.innerHTML = html;
+  // Apply currency symbols
+  const CURRENCY_SYMBOLS = { INR:'₹', USD:'$', EUR:'€', GBP:'£', AED:'د.إ', SGD:'S$', AUD:'A$' };
+  const sym = CURRENCY_SYMBOLS[document.getElementById('currency')?.value] || '$';
+  document.querySelectorAll('[id^="price-sym-"]').forEach(el => el.textContent = sym);
 }
 </script>
 
