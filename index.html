@@ -1845,8 +1845,42 @@ function renderResults(data, originCode, destCode) {
 
     const altExplain = isAlt && r.notes ? `<div class="alt-explanation">✦ ${r.notes}</div>` : '';
 
+    // Build segment table for expanded view
+    const segs = r.itinerary || [];
+    let segRows = '';
+    segs.forEach((seg, si) => {
+      segRows += `<tr>
+        <td class="seg-route">${seg.from} → ${seg.to}</td>
+        <td class="seg-time">${seg.dep}</td>
+        <td class="seg-time">${seg.arr}</td>
+        <td>${seg.duration}</td>
+        <td>${seg.flight||''}</td>
+        <td class="seg-cabin">${r.fareClass||'Economy'}</td>
+      </tr>`;
+      if (si < segs.length-1 && r.layovers && r.layovers[si]) {
+        segRows += `<tr><td colspan="6" style="padding:0">
+          <div class="layover-row">Layover at ${r.layovers[si].airport} · ${r.layovers[si].duration}</div>
+        </td></tr>`;
+      }
+    });
+    const segTable = segs.length > 0 ? `
+      <table class="segment-table">
+        <thead><tr>
+          <th>Route</th><th>Departs</th><th>Arrives</th><th>Duration</th><th>Flight</th><th>Cabin</th>
+        </tr></thead>
+        <tbody>${segRows}</tbody>
+      </table>` : '';
+
+    // Booking URL — use Duffel offerId if available, otherwise airline deep-link
+    const bookUrl = r.offerId
+      ? 'https://book.duffel.com/offers/' + r.offerId
+      : buildBookingUrl(r.airline, r.origin, r.destination,
+          summary.departDate, summary.returnDate,
+          summary.tripType, summary.cabin, summary.passengers);
+    const bookLabel = r.offerId ? 'Book via Duffel' : 'Book on ' + r.airline;
+
     html += `
-      <div class="${cardClass}" style="animation-delay:${i*0.08}s">
+      <div class="${cardClass}" style="animation-delay:${i*0.08}s" onclick="toggleCard(this)">
         ${badge}
         <div class="card-top">
           <div class="route-viz">
@@ -1870,15 +1904,25 @@ function renderResults(data, originCode, destCode) {
             ${isBest && !isAlt ? '<div class="price-saving">lowest fare</div>' : ''}
             ${isAlt && savings > 0 ? `<div class="price-saving">~${savings}% cheaper</div>` : ''}
           </div>
+          <span class="expand-chevron">▼</span>
         </div>
         <div class="card-bottom">
           <div class="card-meta">
-            <strong>${r.airline}</strong> · ${(r.flightNumbers||[]).join(', ')}<br>
-            ${r.baggageIncluded ? '✓ Bag included' : '✗ Bag not included'} &nbsp;·&nbsp;
+            <strong>${r.airline}</strong> · ${(r.flightNumbers||[]).join(', ')}&nbsp;·&nbsp;
+            ${r.baggageIncluded ? '✓ Bag included' : '✗ Bag not included'}&nbsp;·&nbsp;
             ${r.refundable ? '✓ Refundable' : '✗ Non-refundable'}
-            ${itinHtml}
           </div>
           ${altExplain}
+        </div>
+        <div class="card-expanded">
+          ${segTable}
+          ${r.notes ? `<div class="alt-explanation" style="margin-bottom:0.75rem;">${r.notes}</div>` : ''}
+          <div class="book-btn-row">
+            <div class="book-disclaimer">Real fares from airlines via Duffel. Price confirmed at booking.</div>
+            <a class="book-btn" href="${bookUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
+              ${bookLabel} →
+            </a>
+          </div>
         </div>
       </div>`;
   });
