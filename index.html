@@ -1059,7 +1059,7 @@
   <div class="pw-card">
     <div class="pw-logo">✦ LuckyLast Travel</div>
     <div class="pw-tagline">Find cheaper fares to wherever</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v2.0</div>
+    <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:rgba(184,147,58,0.4);letter-spacing:0.1em;margin-top:-0.6rem;margin-bottom:1.5rem;" id="loginVersion">v2.2</div>
     <label class="pw-label" for="pwInput">Access Password</label>
     <input class="pw-input" type="password" id="pwInput" placeholder="Enter password" autocomplete="current-password"
       onkeydown="if(event.key==='Enter') submitPassword()">
@@ -1072,7 +1072,7 @@
 <header>
   <div class="logo">✦ <span>LuckyLast Travel</span></div>
   <div style="display:flex;align-items:center;gap:1rem;">
-    <div class="header-tag" id="headerVersion">v2.0</div>
+    <div class="header-tag" id="headerVersion">v2.2</div>
     <div class="header-tag">AI-Powered Fare Intelligence</div>
   </div>
 </header>
@@ -1296,8 +1296,11 @@
 </div>
 
 <script>
-const APP_VERSION = 'v2.0';
+const APP_VERSION = 'v2.2';
 let SESSION_PASSWORD = '';
+let LAST_RESULTS = null;       // cached last search results for currency re-render
+let LAST_EXCHANGE_RATE = 1.0;  // rate used when results were fetched
+let LAST_USD_PRICES = {};      // map of result id → usdPrice
 
 // ── AIRPORTS DB (common ones) ──
 const AIRPORTS = [
@@ -1500,6 +1503,29 @@ document.querySelectorAll('#loginVersion,#headerVersion').forEach(el => {
 });
 
 // ── TRIP TYPE TOGGLE ──
+// ── CURRENCY CHANGE — re-render results with new conversion ──
+document.getElementById('currency').addEventListener('change', function() {
+  if (!LAST_RESULTS || !LAST_RESULTS.results) return;
+  const newCurrency = this.value;
+  const LIVE_RATES  = { INR: 83.5, EUR: 0.92, GBP: 0.79, AED: 3.67, SGD: 1.35, AUD: 1.53, USD: 1.0 };
+  const newRate     = LIVE_RATES[newCurrency] || 1.0;
+  const SYMBOLS     = { INR:'₹', USD:'$', EUR:'€', GBP:'£', AED:'د.إ', SGD:'S$', AUD:'A$' };
+  const sym         = SYMBOLS[newCurrency] || newCurrency + ' ';
+
+  // Re-price all results using stored USD prices
+  const repriced = {
+    ...LAST_RESULTS,
+    results: LAST_RESULTS.results.map(r => {
+      const usd = LAST_USD_PRICES[r.id] || r.usdPrice || r.price;
+      return { ...r, price: Math.round(usd * newRate * 100) / 100, currency: newCurrency };
+    })
+  };
+
+  const originCode = document.getElementById('origin').value.split('—')[0].trim().split(' ')[0];
+  const destCode   = document.getElementById('dest').value.split('—')[0].trim().split(' ')[0];
+  renderResults(repriced, originCode, destCode);
+});
+
 document.getElementById('tripType').addEventListener('change', function() {
   document.getElementById('returnGroup').style.display = this.value==='oneway' ? 'none' : '';
 });
@@ -1613,7 +1639,8 @@ async function callAI(searchParams) {
   const data = JSON.parse(await res.text());
   if (data._status === 401) throw new Error('Session expired. Reload to re-enter password.');
   if (data._status >= 400) throw new Error(data.error || 'Proxy error ' + data._status);
-  return data.text || '';
+  // Return full data so caller can access exchangeRate etc.
+  return data;
 }
 
 // ── MAIN SEARCH ──
@@ -1664,7 +1691,11 @@ async function doSearch() {
   };
 
   try {
-    const text  = await callAI(searchParams);
+    const rawResponse = await callAI(searchParams);
+    const text  = typeof rawResponse === 'string' ? rawResponse : rawResponse.text;
+    if (rawResponse.exchangeRate) {
+      LAST_EXCHANGE_RATE = rawResponse.exchangeRate;
+    }
     const clean = text.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
 
     let result;
@@ -1672,6 +1703,13 @@ async function doSearch() {
     catch(e) { result = { error: 'Could not parse response', raw: text.slice(0, 300) }; }
 
     saveSearch();
+    // Cache results for currency re-render
+    if (result.results) {
+      LAST_RESULTS = result;
+      LAST_EXCHANGE_RATE = result.results[0]?.exchangeRate || 1.0;
+      LAST_USD_PRICES = {};
+      result.results.forEach(r => { if (r.usdPrice) LAST_USD_PRICES[r.id] = r.usdPrice; });
+    }
     renderResults(result, originCode, destCode);
   } catch(err) {
     if (err.message.includes('Session expired')) {
@@ -1871,13 +1909,11 @@ function renderResults(data, originCode, destCode) {
         <tbody>${segRows}</tbody>
       </table>` : '';
 
-    // Booking URL — use Duffel offerId if available, otherwise airline deep-link
-    const bookUrl = r.offerId
-      ? 'https://book.duffel.com/offers/' + r.offerId
-      : buildBookingUrl(r.airline, r.origin, r.destination,
-          summary.departDate, summary.returnDate,
-          summary.tripType, summary.cabin, summary.passengers);
-    const bookLabel = r.offerId ? 'Book via Duffel' : 'Book on ' + r.airline;
+    // Always use airline deep-link for booking (book.duffel.com is internal only)
+    const bookUrl = buildBookingUrl(r.airline, r.origin, r.destination,
+      summary.departDate, summary.returnDate,
+      summary.tripType, summary.cabin, summary.passengers);
+    const bookLabel = 'Search on ' + r.airline + ' →';
 
     html += `
       <div class="${cardClass}" style="animation-delay:${i*0.08}s" onclick="toggleCard(this)">
@@ -1920,7 +1956,7 @@ function renderResults(data, originCode, destCode) {
           <div class="book-btn-row">
             <div class="book-disclaimer">Real fares from airlines via Duffel. Price confirmed at booking.</div>
             <a class="book-btn" href="${bookUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
-              ${bookLabel} →
+              ${bookLabel}
             </a>
           </div>
         </div>
@@ -1929,10 +1965,14 @@ function renderResults(data, originCode, destCode) {
 
   html += `</div>`;
   panel.innerHTML = html;
-  // Apply currency symbols
+  // Apply currency symbols — use actual currency from each result
   const CURRENCY_SYMBOLS = { INR:'₹', USD:'$', EUR:'€', GBP:'£', AED:'د.إ', SGD:'S$', AUD:'A$' };
-  const sym = CURRENCY_SYMBOLS[document.getElementById('currency')?.value] || '$';
-  document.querySelectorAll('[id^="price-sym-"]').forEach(el => el.textContent = sym);
+  document.querySelectorAll('[id^="price-sym-"]').forEach(el => {
+    const resultId = el.id.replace('price-sym-', '');
+    const result = results.find(r => r.id === resultId);
+    const curr = result?.currency || document.getElementById('currency')?.value || 'USD';
+    el.textContent = CURRENCY_SYMBOLS[curr] || curr + ' ';
+  });
 }
 </script>
 
